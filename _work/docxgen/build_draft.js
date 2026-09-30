@@ -19,7 +19,9 @@ const COLORS = {
   none:   null,
 };
 const FONT = 'Times New Roman';
-const run = (text, opts = {}) => new TextRun({ text, font: FONT, size: 24, ...opts });
+// Текст с переводами строк -> несколько TextRun с разрывом строки (\n в TextRun Word не отображает)
+const runs = (text, opts = {}) => String(text).split(/\r?\n+/).map((t, i) => new TextRun({ text: t, font: FONT, size: 24, ...(i ? { break: 1 } : {}), ...opts }));
+const run = (text, opts = {}) => runs(text, opts)[0];
 const shade = (color) => (COLORS[color] ? { type: ShadingType.CLEAR, color: 'auto', fill: COLORS[color].fill } : undefined);
 
 const comments = [];
@@ -53,7 +55,7 @@ function clauseParagraphs(c) {
   const idRun = c.id && c.kind === 'clause' ? [run(`${c.id}. `, { bold: true })] : [];
   if (c.kind === 'heading') {
     out.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 240, after: 120 },
-      children: [run(c.text || c.section, { bold: true, size: 26 })] }));
+      children: runs(c.text || c.section, { bold: true, size: 26 }) }));
     return out;
   }
   const cid = addComment(commentLines(c));
@@ -66,7 +68,7 @@ function clauseParagraphs(c) {
       const last = i === c.variants.length - 1;
       out.push(new Paragraph({ indent: { left: 360 }, spacing: { after: 60 }, children: [
         run(`Вариант ${i + 1} (${v.sources.join('; ')}): `, { bold: true, shading: shade(c.color) }),
-        run(v.text, { shading: shade(c.color) }),
+        ...runs(v.text || '[положение отсутствует]', { shading: shade(c.color), italics: !v.text }),
         ...(last ? [new CommentRangeEnd(cid), new TextRun({ children: [new CommentReference(cid)] })] : []),
       ] }));
     });
@@ -74,7 +76,7 @@ function clauseParagraphs(c) {
   }
   out.push(new Paragraph({ spacing: { after: 80 }, alignment: AlignmentType.JUSTIFIED, children: [
     new CommentRangeStart(cid), ...idRun,
-    run(c.text || '', { shading: shade(c.color) }),
+    ...runs(c.text || '', { shading: shade(c.color) }),
     ...(c.color === 'yellow' && c.variants && c.variants.length ? [run(' [есть региональные варианты формулировки — см. комментарий]', { italics: true, size: 20, color: '7F6000' })] : []),
     new CommentRangeEnd(cid), new TextRun({ children: [new CommentReference(cid)] }),
   ] }));
