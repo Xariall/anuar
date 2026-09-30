@@ -10,7 +10,7 @@ ANSWERS = {'1.7':'same','2.12':'same','4.10':'same','6.2.2.2':'same','6.2.7':'sa
            '7.5.11':'same','9.2':'same','11.1':'same','11.3':'same','11.4':'same'}
 DNUM = {'1.7':'D1','2.12':'D2','4.10':'D3','6.2.2.2':'D4','6.2.7':'D5','6.6.6':'D6','6.6.12':'D7','6.7.10':'D7',
         '6.8.6':'D8','6.9.1.2':'D9','7.3':'D10','7.5.6':'D11','7.5.11':'D12','9.2':'D13','11.1':'D14','11.3':'D15','11.4':'D16'}
-TENTATIVE = {'D15','D16'}  # заказчик ответил неуверенно («Да?», «мне кажется»)
+TENTATIVE = {'D16'}  # заказчик ответил неуверенно («Да?», «мне кажется»)
 
 def n_absent(c):
     a = c.get('absent_in') or []
@@ -43,7 +43,7 @@ for c in clauses:
                 vs = sorted(c['variants'], key=weight, reverse=True); best = vs[0]
                 c['text'] = best['text']; c['text_source'] = '; '.join(best['sources'])
                 c['variants'] = [v for v in c['variants'] if v is not best]
-                notes.append('Выбрана формулировка большинства договоров.')
+                notes.append('Формулировку выбрал заказчик: «…действующих на момент досрочного погашения».' if d == 'D10' else 'Выбрана формулировка большинства договоров.')
     if col == 'red' and c.get('red_kind') == 'param':
         col = 'orange'
     if col in ('red', 'orange'):
