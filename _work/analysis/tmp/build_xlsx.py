@@ -91,6 +91,10 @@ def build(kind, extra_objs=(), appx=None):
                 manual=MANUAL_NOTE if (not short and any(m in o['file'] for m in MANUAL_OK)) else ''
                 qc.append([o['file'],it.get('ref',''),q[:300],'сокращённая цитата (…)' if short else 'не найдена дословно',manual])
     sheet_list(wb,'Проверка цитат',['Договор','Пункт','Цитата (выдержка агента)','Результат автосверки','Ручная сверка'],qc,[60,45,90,30,50])
+    corr=json.load(open('corrections_stage2.json')).get(kind,[]) if os.path.exists('corrections_stage2.json') else []
+    if corr:
+        ws=sheet_list(wb,'Поправки (этап 3)',['Строка','Было в таблице этапа 2','Исправление (по исходному тексту)','Как проверено'],[[c['row'],c['было'],c['исправление'],c['проверка']] for c in corr],[40,60,80,35])
+        ws.insert_rows(1); ws['A1']='При подготовке этапа 3 найдены неточности этапа 2. Лист «Сравнение» не переписан: читайте его вместе с этим листом.'; ws['A1'].fill=YEL
     if appx: appx(wb)
     out=f'../02_сравнение_{NAMES[kind]}.xlsx'; wb.save(out); print(out,len(m['rows']),'rows',len(cols),'cols; ic',len(ic),'kk',len(kd),'res',len(rs),'quotes-flag',len(qc))
 if __name__=='__main__':
