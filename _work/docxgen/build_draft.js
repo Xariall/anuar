@@ -39,8 +39,9 @@ function commentLines(c) {
   const cat = COLORS[c.color] ? COLORS[c.color].label : 'Без выделения';
   L.push(`Пункт ${c.id} — ${cat}${c.red_kind ? ` (${c.red_kind === 'param' ? 'разные значения параметра' : 'противоречие'})` : ''}${c.block ? `; блок ${c.block}` : ''}`);
   if (c.text_source) L.push(`Текст взят: ${c.text_source}`);
-  if (c.present_in && c.present_in.length) L.push(`Есть в: ${c.present_in.join('; ')}`);
-  if (c.absent_in && c.absent_in.length) L.push(`Нет в: ${c.absent_in.join(', ')}`);
+  if (c.presence_summary) L.push(c.presence_summary);
+  if (c.present_in && c.present_in.length) L.push(`Где в исходниках (регион, пункт): ${c.present_in.join('; ')}`);
+  if (!c.presence_summary && c.absent_in && c.absent_in.length) L.push(`Нет в: ${c.absent_in.join(', ')}`);
   if (c.color === 'yellow' && c.variants && c.variants.length) {
     L.push('Региональные варианты формулировки (смысл тот же):');
     c.variants.forEach((v, i) => L.push(`  ${i + 1}) «${v.text}» — ${v.sources.join('; ')}`));
@@ -102,13 +103,27 @@ function legend() {
   ] })) });
 }
 
+function sourcesTable() {
+  const w = [2400, 2900, 4060];
+  const border = { style: BorderStyle.SINGLE, size: 4, color: '999999' };
+  const borders = { top: border, bottom: border, left: border, right: border };
+  const cell = (t, i, bold) => new TableCell({ width: { size: w[i], type: WidthType.DXA }, borders,
+    shading: bold ? { type: ShadingType.CLEAR, color: 'auto', fill: 'E7E6E6' } : undefined,
+    children: [new Paragraph({ children: [run(t, { size: 18, bold })] })] });
+  const rows = [new TableRow({ tableHeader: true, children: ['Краткое название (в комментариях)', 'Папка региона', 'Файл'].map((t, i) => cell(t, i, true)) })];
+  (data.sources || []).forEach((s) => rows.push(new TableRow({ children: [cell(s.short, 0), cell(s.region, 1), cell(s.file, 2)] })));
+  return new Table({ width: { size: 9360, type: WidthType.DXA }, columnWidths: w, rows });
+}
+
 const body = [];
 body.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [run('РАБОЧИЙ ЧЕРНОВИК — НЕ ЯВЛЯЕТСЯ ДОГОВОРОМ', { bold: true, color: 'C00000' })] }));
 body.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 120 }, children: [run(data.title || 'Единый договор займа (кредита)', { bold: true, size: 28 })] }));
 (data.intro || []).forEach((t) => body.push(new Paragraph({ spacing: { after: 80 }, children: [run(t, { size: 20 })] })));
 body.push(new Paragraph({ spacing: { before: 120, after: 60 }, children: [run('Цветовая маркировка', { bold: true })] }));
 body.push(legend());
-body.push(new Paragraph({ spacing: { after: 240 }, children: [run('Источник каждого пункта — в комментарии к нему (№ договора по реестру 01_реестр.xlsx, регион, пункт).', { size: 20, italics: true })] }));
+body.push(new Paragraph({ spacing: { before: 200, after: 60 }, children: [run('Исходные договоры', { bold: true })] }));
+body.push(sourcesTable());
+body.push(new Paragraph({ spacing: { after: 240 }, children: [run('Источник каждого пункта — в комментарии к нему: краткое название договора из этой таблицы и номер пункта в исходном файле.', { size: 20, italics: true })] }));
 data.clauses.forEach((c) => clauseParagraphs(c).forEach((p) => body.push(p)));
 
 const doc = new Document({
