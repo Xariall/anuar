@@ -31,7 +31,8 @@ d = json.load(open('l1_draft.json'))
 out = []
 for c in d['clauses']:
     if c['id'] in DROP: continue
-    r = {'id': c['id'] if re.match(r'^\d', c['id'] or '') else '', 'kind': c['kind'], 'text': c.get('text')}
+    if c['kind'] == 'heading' and (c.get('text') or '').strip().lower().startswith('преамбула'): continue  # служебный заголовок структуры
+    r = {'id': c['id'] if re.match(r'^[1-9]', c['id'] or '') else '', 'kind': c['kind'], 'text': c.get('text')}
     if c['kind'] == 'heading' or c['color'] == 'none':
         r['level'] = None; out.append(r); continue
     if c['color'] in ('red', 'orange'):

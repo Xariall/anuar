@@ -30,6 +30,9 @@ for c in clauses:
         if d in PENDING or ans is None:
             col = 'red'; c['red_kind'] = 'conflict'
             notes.append(f'Смысловая эквивалентность уточняется у заказчика ({d}); до ответа — без выбора.')
+        elif ans == 'diff':
+            col = 'red'; c['red_kind'] = 'conflict'
+            notes.append('Заказчик подтвердил (04.10.2026): формулировки различаются по смыслу; выбор не сделан.')
         elif ans == 'open':
             col = 'red'; c['red_kind'] = 'conflict'
             notes.append(f'{d}: заказчик оставил вопрос открытым; выбор не сделан.')
@@ -37,7 +40,7 @@ for c in clauses:
             col = 'blue'; notes.append(f'{d}: заказчик подтвердил, что это пояснение к обязанности подтвердить целевое использование, а не иной способ.')
         else:
             col = 'yellow'
-            notes.append(f'{d}: смысловая эквивалентность подтверждена заказчиком' + (' (ответ предварительный — стоит перепроверить юристу)' if d in TENTATIVE else '') + '.')
+            notes.append('Смысловая эквивалентность подтверждена заказчиком (04.10.2026)' + (' (ответ предварительный — стоит перепроверить юристу)' if d in TENTATIVE else '') + '.')
             if not c.get('text'):
                 vs = sorted(c['variants'], key=weight, reverse=True); best = vs[0]
                 c['text'] = best['text']; c['text_source'] = '; '.join(best['sources'])

@@ -22,12 +22,13 @@ const addComment = (lines) => {
 };
 const num = (c) => (c.id ? [new TextRun({ text: `${c.id}. `, font: FONT, size: 24, bold: true })] : []);
 
+const LEG = Object.assign({ all: 'есть у всех регионов', some: 'у нескольких регионов', one: 'только у одного региона' }, data.legend || {});
 const body = [];
 body.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 }, children: runs(data.title, { bold: true, size: 28 }) }));
 body.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 280 }, children: [
-  new TextRun({ text: '  есть у всех регионов  ', font: FONT, size: 18, shading: shade('all') }), new TextRun({ text: '   ', size: 18 }),
-  new TextRun({ text: '  у нескольких регионов  ', font: FONT, size: 18, shading: shade('some') }), new TextRun({ text: '   ', size: 18 }),
-  new TextRun({ text: '  только у одного региона  ', font: FONT, size: 18, shading: shade('one') }),
+  new TextRun({ text: `  ${LEG.all}  `, font: FONT, size: 18, shading: shade('all') }), new TextRun({ text: '   ', size: 18 }),
+  new TextRun({ text: `  ${LEG.some}  `, font: FONT, size: 18, shading: shade('some') }), new TextRun({ text: '   ', size: 18 }),
+  new TextRun({ text: `  ${LEG.one}  `, font: FONT, size: 18, shading: shade('one') }),
 ] }));
 
 for (const c of data.clauses) {
