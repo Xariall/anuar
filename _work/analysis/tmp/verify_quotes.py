@@ -1,6 +1,6 @@
 import json, glob, re, os, sys, unicodedata
 NF=lambda x: unicodedata.normalize('NFC',x)
-TXT='/Users/asanaliesmagambetov/Documents/anuar/_work/text/'
+TXT=os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','..','text')+'/'
 def norm(s):
     s=s.replace(' ',' ').replace('«','"').replace('»','"').replace('“','"').replace('”','"').replace('—','-').replace('–','-')
     return re.sub(r'\s+',' ',s).strip().lower()

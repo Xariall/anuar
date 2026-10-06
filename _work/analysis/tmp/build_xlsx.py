@@ -9,6 +9,14 @@ NAMES={'займ':'займ','залог':'залог','гарантия':'га�
 TITLES={'займ':'Договор займа (кредита, микрокредита, бюджетного кредита)','залог':'Договор залога','гарантия':'Договор гарантии (по содержанию — поручительство)','поручение':'Договор поручения (агентский)','дкп':'Договор купли-продажи для передачи в финансовый лизинг','лизинг':'Договор финансового лизинга'}
 HDR=PatternFill('solid',fgColor='D9E1F2'); GREY=PatternFill('solid',fgColor='F2F2F2'); YEL=PatternFill('solid',fgColor='FFF2CC')
 MAXC=32000
+# Ручная сверка цитат, не найденных автосверкой (фрагменты найдены grep по _work/text/; расхождение только в оформлении)
+MANUAL_OK=('Образец ДКП лизинг','Область Жетісу/договора/Договор займа','КД Балмұқан','договор займа (с переводом УСХ)','Область Абай/договора/Договор залога')
+MANUAL_NOTE='подтверждена вручную: текст есть в источнике; отличие в маркерах списка, переносах строк или длине подчёркиваний'
+def ic_note(desc):
+    d=desc.lower()
+    if 'солидарн' in d and 'назван' in d and 'залогодерж' not in d:
+        return 'Несоответствие названия и содержания (гарантия / поручительство). По правилам заказчика это не противоречие; вопрос квалификации — спорный случай №1 этапа 1, решает юрист.'
+    return ''
 def cell_text(items):
     parts=[]
     for it in items:
@@ -59,13 +67,14 @@ def build(kind, extra_objs=(), appx=None):
     for o in seen:
         f=o['file']; src=o['_src']
         for x in o.get('internal_contradictions',[]):
-            ic.append([f,', '.join(map(str,x.get('refs',[]))) if isinstance(x,dict) else '',x.get('description',str(x)) if isinstance(x,dict) else str(x)])
+            desc=x.get('description',str(x)) if isinstance(x,dict) else str(x)
+            ic.append([f,', '.join(map(str,x.get('refs',[]))) if isinstance(x,dict) else '',desc,ic_note(desc)])
         for x in o.get('kk_divergences',[]):
             kd.append([f,x.get('ref_rus',''),x.get('ref_kk',''),x.get('description','')] if isinstance(x,dict) else [f,'','',str(x)])
         for x in o.get('residuals',[]):
             rs.append([f,x.get('ref','') if isinstance(x,dict) else '',(x.get('description') or x.get('text') or json.dumps(x,ensure_ascii=False)) if isinstance(x,dict) else str(x)])
         st.append([f,str(o.get('status','')),str(o.get('notes',''))])
-    sheet_list(wb,'Внутренние противоречия',['Договор','Пункты','Описание'],ic,[60,45,110])
+    sheet_list(wb,'Внутренние противоречия',['Договор','Пункты','Описание','Примечание (квалификация)'],ic,[60,45,110,50])
     sheet_list(wb,'Расхождения каз.-рус.',['Договор','Пункт (рус.)','Пункт (каз.)','Описание'],kd,[60,30,30,110])
     sheet_list(wb,'Остатки чужих данных',['Договор','Пункт','Описание'],rs,[60,40,110])
     sheet_list(wb,'Статус и полнота чтения',['Договор','Статус','Примечания экстрактора (что прочитано)'],st,[60,40,120])
@@ -78,8 +87,14 @@ def build(kind, extra_objs=(), appx=None):
         for it in o['items']:
             q=it.get('quote','')
             if q and it.get('summary')!='отсутствует' and vq.norm(q) not in own:
-                qc.append([o['file'],it.get('ref',''),q[:300],'сокращённая цитата (…)' if ('...' in q or '…' in q) else 'не найдена дословно'])
-    sheet_list(wb,'Проверка цитат',['Договор','Пункт','Цитата (выдержка агента)','Результат автосверки'],qc,[60,45,90,30])
+                short=('...' in q or '…' in q)
+                manual=MANUAL_NOTE if (not short and any(m in o['file'] for m in MANUAL_OK)) else ''
+                qc.append([o['file'],it.get('ref',''),q[:300],'сокращённая цитата (…)' if short else 'не найдена дословно',manual])
+    sheet_list(wb,'Проверка цитат',['Договор','Пункт','Цитата (выдержка агента)','Результат автосверки','Ручная сверка'],qc,[60,45,90,30,50])
+    corr=json.load(open('corrections_stage2.json')).get(kind,[]) if os.path.exists('corrections_stage2.json') else []
+    if corr:
+        ws=sheet_list(wb,'Поправки (этап 3)',['Строка','Было в таблице этапа 2','Исправление (по исходному тексту)','Как проверено'],[[c['row'],c['было'],c['исправление'],c['проверка']] for c in corr],[40,60,80,35])
+        ws.insert_rows(1); ws['A1']='При подготовке этапа 3 найдены неточности этапа 2. Лист «Сравнение» не переписан: читайте его вместе с этим листом.'; ws['A1'].fill=YEL
     if appx: appx(wb)
     out=f'../02_сравнение_{NAMES[kind]}.xlsx'; wb.save(out); print(out,len(m['rows']),'rows',len(cols),'cols; ic',len(ic),'kk',len(kd),'res',len(rs),'quotes-flag',len(qc))
 if __name__=='__main__':
