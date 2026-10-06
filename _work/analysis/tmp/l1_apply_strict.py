@@ -44,7 +44,7 @@ for c in d['clauses']:
             top.sort(key=lambda x: min(PREF.index(r) for r in x[1]) if x[1] else 9)
             log['tie_by_preference'].append(c['id'] or '(без №)')
         j, regs = top[0]; v = c['variants'][j]
-        if not v.get('text'):
+        if not v.get('text') or v['text'].strip() == '[не предусмотрено]':  # пометка «у региона пункта нет»
             log['variant_dropped_absent'].append(c['id'] or '(без №)'); continue
         others = [', '.join(r) for k, r in cand if k != j and r]
         reason = 'у большинства регионов' if len(top) == 1 else 'у каждой редакции по одному региону — выбрана редакция ' + regs[0]
@@ -64,13 +64,13 @@ for k, c in enumerate(out):
         if nxt is None or nxt['kind'] == 'heading':
             continue
     clean.append(c)
-n = 0
-for c in clean:  # единый вид заголовков разделов: «N. НАЗВАНИЕ», номера по порядку
+for k, c in enumerate(clean):  # единый вид заголовков разделов: «N. НАЗВАНИЕ», N — исходный номер раздела (по его пунктам)
     if c['kind'] == 'heading':
         t = re.sub(r'^(Раздел\s+)?\d+\.\s*', '', (c.get('text') or '').strip())
         if t.upper().startswith('ПРИЛОЖЕНИЯ'):
             c['text'] = t.upper(); continue
-        n += 1; c['text'] = f'{n}. {t.upper()}'
+        first = next((x.get('id') for x in clean[k + 1:] if x.get('id')), None)
+        c['text'] = f'{first.split(".")[0]}. {t.upper()}'
 d['clauses'] = clean
 suffix = 'anuar' if ANUAR else 'strict'
 json.dump(d, open(f'l1_reader_{suffix}.json', 'w'), ensure_ascii=False, indent=1)
