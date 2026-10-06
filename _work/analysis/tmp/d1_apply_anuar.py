@@ -11,6 +11,8 @@ for i, j, m in json.load(open('an_marks.json')):
     marks[i][j] = m
 EXCLUDE_BY_COMMENT = {'6.2.15', '6.2.16', '6.2.17.2', '6.2.20.1'}
 KEEP_BLOCK = '6.11'
+# Правки текста, которые Ануар внёс прямо в файл v3 (сверка с отправленным черновиком построчно)
+TEXT_EDITS = [('гражданин(-ка) Республики Казахстан ТОО/ИП/КХ/ФХ', 'гражданин(-ка) Республики Казахстан ТОО/ИП/КООПЕРАТИВ')]
 
 def regions_of(comment, j):
     for line in comment:
@@ -18,7 +20,7 @@ def regions_of(comment, j):
         if m: return m.group(1)
     return ''
 
-out, log = [], {'kept_variant': [], 'deleted': [], 'unmarked_variants': [], 'excluded_by_comment': []}
+out, log = [], {'kept_variant': [], 'deleted': [], 'unmarked_variants': [], 'excluded_by_comment': [], 'text_edits': []}
 for i, c in enumerate(d['clauses']):
     mk = marks.get(i, {})
     cid = c.get('id') or ''
@@ -29,10 +31,13 @@ for i, c in enumerate(d['clauses']):
         log['excluded_by_comment'].append(cid); continue
     if c.get('variants'):
         vm = [mk.get(j, 'none') for j in range(len(c['variants']))]
-        if all(m == 'red' for m in vm):
+        if mk.get('hdr') == 'red' or all(m == 'red' for m in vm):  # красный заголовок группы — удалить группу целиком
             log['deleted'].append(cid or c['variants'][0]['text'][:40]); continue
         if 'green' in vm:
-            j = vm.index('green'); v = c['variants'][j]
+            j = vm.index('green'); v = dict(c['variants'][j])
+            for old, new in TEXT_EDITS:
+                if v.get('text') and v['text'].startswith(old):
+                    v['text'] = new + v['text'][len(old):]; log['text_edits'].append(cid or new[:40])
             others = [regions_of(c['comment'], k) for k in range(len(c['variants'])) if k != j and vm[k] != 'red']
             out.append({'id': cid, 'kind': 'clause', 'text': v['text'], 'level': v['level'] or 'one',
                         'comment': [f'Выбрана редакция: {regions_of(c["comment"], j)}'] +
