@@ -2,7 +2,7 @@
 // Невыбранные редакции даются в квадратных скобках через «/», как принято в шаблонах:
 // первый пункт с вариантами (название договора) — заголовком по центру.
 // Нумерация и ссылки — как в файле с отметками Ануара (не перенумеровываются).
-// Запуск: node build_clean.js <d1_reader_v4.json> <выход.docx>
+// Запуск: node build_clean.js <d1_reader_v4.json | l1_reader_anuar.json> <выход.docx>
 const fs = require('fs');
 const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 

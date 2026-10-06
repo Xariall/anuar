@@ -4,8 +4,16 @@
 # Правила: обычный пункт остаётся только если он есть у всех трёх регионов; в вариантах — вариант большинства
 # регионов (если у большинства положения нет — пункт убирается); при равенстве — редакция Костаная
 # (самый новый шаблон), затем Туркестана, затем ЗКО. Служебный текст (поля, реквизиты) остаётся.
-import json, re
+# Запуск с аргументом «anuar» дополнительно применяет отметки Ануара из файла «…лизинга v3.docx» (06.10.2026)
+# и пишет l1_reader_anuar.json; без аргумента — прежняя версия 2 (l1_reader_strict.json).
+import json, re, sys
+ANUAR = len(sys.argv) > 1 and sys.argv[1] == 'anuar'
 d = json.load(open('l1_reader.json'))
+# Ответы Ануара на комментарии черновика: преамбула — две редакции (вариант 2 — без партнёра,
+# вариант 3 — с партнёром-ТОО, отмечен зелёным); 1.1.1 — «исключить»; 1.1 и 1.2 — «оставить».
+KEEP_VARIANTS = {'Вариант 1 — Костанай|Вариант 2 — ЗКО|Вариант 3 — Туркестан': [1, 2]} if ANUAR else {}
+EXCLUDE = {'1.1.1'} if ANUAR else set()
+KEEP = {'1.1', '1.2'} if ANUAR else set()
 PREF = ['Костанай', 'Туркестан', 'ЗКО']
 
 def var_regions(comment, j):
@@ -20,6 +28,14 @@ for c in d['clauses']:
         if c['kind'] == 'heading' or (c.get('text') or '').strip():
             out.append(c)
         continue
+    if c.get('id') in EXCLUDE:
+        log.setdefault('anuar', []).append('исключён ' + c['id']); continue
+    if c.get('id') in KEEP:
+        out.append(c); log.setdefault('anuar', []).append('оставлен ' + c['id']); continue
+    key = '|'.join(l for l in c.get('comment', []) if l.startswith('Вариант'))
+    if c.get('variants') and not c.get('id') and key in KEEP_VARIANTS:
+        out.append(dict(c, variants=[c['variants'][j] for j in KEEP_VARIANTS[key]]))
+        log.setdefault('anuar', []).append('преамбула: две редакции'); continue
     if c.get('variants'):
         cand = [(j, var_regions(c['comment'], j)) for j in range(len(c['variants']))]
         best = max(len(r) for _, r in cand)
@@ -56,6 +72,7 @@ for c in clean:  # единый вид заголовков разделов: «
             c['text'] = t.upper(); continue
         n += 1; c['text'] = f'{n}. {t.upper()}'
 d['clauses'] = clean
-json.dump(d, open('l1_reader_strict.json', 'w'), ensure_ascii=False, indent=1)
-json.dump(log, open('l1_strict_log.json', 'w'), ensure_ascii=False, indent=1)
+suffix = 'anuar' if ANUAR else 'strict'
+json.dump(d, open(f'l1_reader_{suffix}.json', 'w'), ensure_ascii=False, indent=1)
+json.dump(log, open(f'l1_{suffix}_log.json', 'w'), ensure_ascii=False, indent=1)
 print({k: (v if isinstance(v, int) else len(v)) for k, v in log.items()}, '| пунктов в итоге:', sum(1 for c in clean if c['kind'] != 'heading'))
