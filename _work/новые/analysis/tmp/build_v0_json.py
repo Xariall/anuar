@@ -54,6 +54,7 @@ Q = {
      ["В Н-060 опрашивают посетителей, объём и оплата — в анкетах; остальной текст совпадает с Т-001/Т-004."]),
 }
 WHO = {k: QX[k]["кто"] for k in QX}
+DECIDED = {k: QX[k]["решение"] for k in QX if QX[k].get("решение")}
 
 def body(t): return re.sub(r'^\d+(\.\d+)*\.?\s*', '', t.strip())
 def norm(t): return re.sub(r'[\s_«»"“”.,;:()\-–]+', ' ', body(t).lower()).strip()
@@ -85,6 +86,8 @@ def qlines(qs, here):
             L.append(f"См. ВОПРОС № {q} (к п. {seen_q[q]})."); continue
         seen_q[q] = here
         head, opts = Q[q]
+        if q in DECIDED:
+            L.append(f"✅ ВОПРОС № {q} РЕШЁН: {head}"); L += ["   " + x for x in DECIDED[q].split("\n")]; continue
         L.append(f"❓ ВОПРОС КОМАНДЕ № {q} ({WHO[q]}): {head}")
         L += ["   " + o for o in opts]
         L.append("   Ответ: ____________________")
@@ -128,6 +131,15 @@ for key, cells in items:
             for g in gl[1:]: C.append(f"Другая редакция ({', '.join(g)}): «{body(cells[g[0]]['text'])[:700]}»")
     else:
         variants = [{"text": body(cells[g[0]]["text"]), "sources": [f"{k} {FORM[k]}" for k in g]} for g in gl]
+    if key == "2":
+        F = "[ФОРМА — из справочника форм (nameRu); если форм несколько — через «; »]"
+        t1 = body(cells["Н2"]["text"]).replace("Т-001 (месячная) «Анкета выборочного обследования занятости населения»", F)
+        t7 = body(cells["Н7"]["text"]).replace("Н-060 «Анкета обследования посетителей»", F)
+        assert F in t1 and F in t7
+        t1 = re.sub(r"\]\s+в объеме", "] в объеме", t1)
+        variants = [{"text": t1, "sources": ["все формы, кроме Н-060; текст Н2 (п. 1.1); в Н1–Н6 этот пункт отличается только названием формы"]},
+                    {"text": t7, "sources": ["только Н-060 — до решения вопроса 13; текст Н7 (п. 1.1)"]}]
+        C = [c for c in C if not c.startswith("Различия")]
     # ссылки на пункты — по нумерации черновика
     if key == "28":
         text = re.sub(r"пункте 2\.1\.\d+", f"пункте [{NOTICE}]", text)
