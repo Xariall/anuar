@@ -1,88 +1,74 @@
-// Нулевая версия единого договора с интервьюером (БНС) в DOCX: цвета + примечания с вопросами команде
+// Версия 0 единого договора с интервьюером (БНС) в DOCX: таблица «каз | рус», как в исходниках Н1/Н6/Н7
 // Запуск: node build_bns_v0.js <v0.json> <выход.docx>
 const fs = require('fs');
 const {
-  Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ShadingType,
-  CommentRangeStart, CommentRangeEnd, CommentReference, Table, TableRow, TableCell, WidthType, BorderStyle,
+  Document, Packer, Paragraph, TextRun, AlignmentType, ShadingType, Table, TableRow, TableCell, WidthType, BorderStyle,
+  CommentRangeStart, CommentRangeEnd, CommentReference, TableLayoutType,
 } = require('docx');
 
 const [, , inPath, outPath] = process.argv;
 const data = JSON.parse(fs.readFileSync(inPath, 'utf8'));
 const FONT = 'Times New Roman';
-const COLORS = {
-  yellow: { fill: 'FFEB9C', label: 'Жёлтый' },
-  orange: { fill: 'F8CBAD', label: 'Оранжевый' },
-  blue:   { fill: 'BDD7EE', label: 'Синий' },
-};
-const runs = (text, opts = {}) => String(text).split(/\r?\n+/).map((t, i) => new TextRun({ text: t, font: FONT, size: 24, ...(i ? { break: 1 } : {}), ...opts }));
-const run = (text, opts = {}) => runs(text, opts)[0];
-const shade = (c) => (COLORS[c] ? { type: ShadingType.CLEAR, color: 'auto', fill: COLORS[c].fill } : undefined);
+const SIZE = 20;                                    // 10 пт (в исходниках 9,5 пт)
+const W = [5495, 5528];                             // ширины колонок из исходника Н1
+const FILL = { yellow: 'FFEB9C', orange: 'F8CBAD', blue: 'BDD7EE' };
+const shade = (c) => (FILL[c] ? { type: ShadingType.CLEAR, color: 'auto', fill: FILL[c] } : undefined);
+const runs = (text, o = {}) => String(text).split(/\r?\n/).map((t, i) => { const r = new TextRun({ text: t, font: FONT, size: SIZE, ...(i ? { break: 1 } : {}), ...o }); if (i) r.__brk = true; return r; });
 
 const comments = [];
 function addComment(lines) {
   const id = comments.length;
-  comments.push({
-    id, author: 'Версия 0 (анализ)', initials: 'В0', date: new Date('2026-11-03T00:00:00Z'),
-    children: lines.filter(Boolean).map((l) => new Paragraph({ children: [new TextRun({ text: l, size: 18, bold: l.startsWith('❓') })] })),
-  });
+  comments.push({ id, author: 'Версия 0', initials: 'В0', date: new Date('2026-11-03T00:00:00Z'),
+    children: lines.map((l) => new Paragraph({ children: [new TextRun({ text: l, size: 18 })] })) });
   return id;
 }
-const endC = (cid) => [new CommentRangeEnd(cid), new TextRun({ children: [new CommentReference(cid)] })];
+const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+const noBorders = { top: none, bottom: none, left: none, right: none };
+const P = (children, o = {}) => new Paragraph({ alignment: children.some((r) => r instanceof TextRun && r.__brk) ? AlignmentType.LEFT : AlignmentType.JUSTIFIED, spacing: { after: 40 }, children, ...o });
+const cell = (paras, i, fill) => new TableCell({ width: { size: W[i], type: WidthType.DXA }, borders: noBorders,
+  margins: { left: 80, right: 80 }, shading: fill ? { type: ShadingType.CLEAR, color: 'auto', fill } : undefined, children: paras });
+const row = (l, r, fill) => new TableRow({ cantSplit: false, children: [cell(l, 0, fill), cell(r, 1, fill)] });
 
-function render(c) {
-  if (c.kind === 'heading') return [new Paragraph({ heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER, spacing: { before: 240, after: 120 },
-    children: runs(c.text, { bold: true, size: 24, color: '000000' }) })];
-  if (c.kind === 'subhead') return [new Paragraph({ spacing: { before: 80, after: 60 }, children: [run(`${c.id}. `, { bold: true }), run(c.text, { bold: true })] })];
-  const idRun = c.id ? [run(`${c.id}. `, { bold: true })] : [];
-  const cid = c.comment && c.comment.filter(Boolean).length ? addComment(c.comment) : null;
-  const start = cid !== null ? [new CommentRangeStart(cid)] : [];
-  const end = cid !== null ? endC(cid) : [];
+function clauseRows(c) {
+  if (c.kind === 'heading') {
+    const h = (t) => [P(runs(t, { bold: true }), { alignment: AlignmentType.CENTER, spacing: { before: 120, after: 60 } })];
+    return [row(h(c.kz), h(c.ru))];
+  }
+  if (c.kind === 'subhead') return [row([P(runs(c.kz, { bold: true }))], [P(runs(c.ru, { bold: true }))])];
+  if (c.kind === 'requisites') return data.requisites.map(([l, r]) => row([P(runs(l), { alignment: AlignmentType.LEFT })], [P(runs(r), { alignment: AlignmentType.LEFT })]));
+  const id = c.id ? `${c.id}. ` : '';
+  const cid = c.comment ? addComment(c.comment) : null;
+  const mark = (inner) => (cid === null ? inner : [new CommentRangeStart(cid), ...inner, new CommentRangeEnd(cid), new TextRun({ children: [new CommentReference(cid)] })]);
   if (c.variants) {
-    const out = [new Paragraph({ spacing: { before: 60 }, children: [...start, ...idRun,
-      run('[ВАРИАНТЫ — выбор не сделан, см. примечание]', { italics: true, shading: shade(c.color) })] })];
-    c.variants.forEach((v, i) => out.push(new Paragraph({ indent: { left: 360 }, spacing: { after: 60 }, alignment: /\n/.test(v.text) ? AlignmentType.LEFT : AlignmentType.JUSTIFIED, children: [
-      run(`Вариант ${i + 1} (${v.sources.join(', ')}): `, { bold: true, shading: shade(c.color) }),
-      ...runs(v.text, { shading: shade(c.color) }),
-      ...(i === c.variants.length - 1 ? end : []),
-    ] })));
+    const out = [row([P([new TextRun({ text: id, bold: true, font: FONT, size: SIZE }), ...runs('[нұсқалар — таңдау жасалмаған]', { italics: true })])],
+                     [P(mark([new TextRun({ text: id, bold: true, font: FONT, size: SIZE }), ...runs('[ВАРИАНТЫ — выбор не сделан]', { italics: true })]))])];
+    c.variants.forEach((v, i) => out.push(row(
+      [P([...runs(`${i + 1}-нұсқа (${v.forms}): `, { bold: true }), ...runs(v.kz)])],
+      [P([...runs(`Вариант ${i + 1} (${v.forms}): `, { bold: true }), ...runs(v.ru)])], FILL[c.color])));
     return out;
   }
-  const tag = c.color === 'blue' ? [run(' [есть не во всех договорах — см. примечание]', { italics: true, size: 20, color: '1F4E79' })]
-    : c.color === 'yellow' ? [run(' [есть другие формулировки — см. примечание]', { italics: true, size: 20, color: '7F6000' })] : [];
-  return [new Paragraph({ spacing: { after: 80 }, alignment: /\n/.test(c.text || '') ? AlignmentType.LEFT : AlignmentType.JUSTIFIED, children: [
-    ...start, ...idRun, ...runs(c.text || '', { shading: shade(c.color) }), ...tag, ...end] })];
+  const b = (t) => [new TextRun({ text: id, bold: true, font: FONT, size: SIZE }), ...runs(t)];
+  return [row([P(b(c.kz))], [P(mark(b(c.ru)))], FILL[c.color])];
 }
 
-const border = { style: BorderStyle.SINGLE, size: 4, color: '999999' };
-const borders = { top: border, bottom: border, left: border, right: border };
-function table(rows, w, headFill) {
-  return new Table({ width: { size: w.reduce((a, b) => a + b), type: WidthType.DXA }, columnWidths: w, rows: rows.map((r, ri) => new TableRow({ children: r.map((t, i) => new TableCell({
-    width: { size: w[i], type: WidthType.DXA }, borders,
-    shading: (ri === 0 && headFill) ? { type: ShadingType.CLEAR, color: 'auto', fill: headFill } : (typeof t === 'object' && t.fill ? { type: ShadingType.CLEAR, color: 'auto', fill: t.fill } : undefined),
-    children: [new Paragraph({ children: [run(typeof t === 'object' ? t.text : t, { size: 20, bold: ri === 0 && !!headFill })] })] })) })) });
-}
+const head = [];
+head.push(new Paragraph({ alignment: AlignmentType.CENTER, children: runs('РАБОЧИЙ ЧЕРНОВИК (ВЕРСИЯ 0) — НЕ ЯВЛЯЕТСЯ ДОГОВОРОМ', { bold: true, color: 'C00000' }) }));
+data.intro.forEach((t) => head.push(new Paragraph({ spacing: { after: 40 }, children: runs(t, { size: 18 }) })));
+head.push(new Paragraph({ spacing: { after: 160 }, children: [
+  ...runs('Цвета: ', { size: 18, bold: true }), ...runs('без цвета — одинаково во всех 7;  ', { size: 18 }),
+  ...runs(' жёлтый ', { size: 18, shading: shade('yellow') }), ...runs(' — формулировки чуть разные, взята редакция большинства;  ', { size: 18 }),
+  ...runs(' оранжевый ', { size: 18, shading: shade('orange') }), ...runs(' — разные условия, все варианты;  ', { size: 18 }),
+  ...runs(' синий ', { size: 18, shading: shade('blue') }), ...runs(' — пункт есть не во всех договорах.', { size: 18 }) ] }));
 
-const body = [];
-body.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [run('РАБОЧИЙ ЧЕРНОВИК (ВЕРСИЯ 0) — НЕ ЯВЛЯЕТСЯ ДОГОВОРОМ', { bold: true, color: 'C00000' })] }));
-body.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 120 }, children: [run(data.title, { bold: true, size: 28 })] }));
-data.intro.forEach((t) => body.push(new Paragraph({ spacing: { after: 80 }, children: [run(t, { size: 20 })] })));
-body.push(new Paragraph({ spacing: { before: 120, after: 60 }, children: [run('Цвета в тексте', { bold: true })] }));
-body.push(table([
-  ['Без выделения', 'Пункт одинаковый во всех 7 договорах.'],
-  [{ text: 'Жёлтый', fill: COLORS.yellow.fill }, 'Формулировки немного различаются, смысл одинаков. В тексте — вариант большинства, остальные — в примечании.'],
-  [{ text: 'Оранжевый', fill: COLORS.orange.fill }, 'В договорах разные условия (разные значения). Приведены все варианты, выбор не сделан.'],
-  [{ text: 'Синий', fill: COLORS.blue.fill }, 'Пункт есть только в части договоров.'],
-], [2200, 7160]));
-body.push(new Paragraph({ spacing: { before: 200, after: 60 }, children: [run('Исходные договоры', { bold: true })] }));
-body.push(table([['Код', 'Файл (_work/новые/исходники/)'], ...data.sources.map((s) => [s.short, s.file])], [2200, 7160], 'E7E6E6'));
-body.push(new Paragraph({ pageBreakBefore: true, alignment: AlignmentType.CENTER, children: [run('ДОГОВОР № __', { bold: true })] }));
-body.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 120 }, children: [run('возмездного оказания услуг', { bold: true })] }));
-data.clauses.forEach((c) => render(c).forEach((p) => body.push(p)));
+const rows = [row([P(runs('Өтеулі қызметтер көрсету туралы\nШАРТ № __', { bold: true }), { alignment: AlignmentType.CENTER })],
+                  [P(runs('ДОГОВОР № __\nвозмездного оказания услуг', { bold: true }), { alignment: AlignmentType.CENTER })])];
+data.clauses.forEach((c) => clauseRows(c).forEach((r) => rows.push(r)));
+const table = new Table({ width: { size: W[0] + W[1], type: WidthType.DXA }, columnWidths: W, layout: TableLayoutType.FIXED, borders: { top: none, bottom: none, left: none, right: none, insideHorizontal: none, insideVertical: none }, rows });
 
 const doc = new Document({
-  creator: 'Анализ договоров БНС', title: data.title,
-  styles: { default: { document: { run: { font: FONT, size: 24 } } } },
+  creator: 'Анализ договоров БНС', title: 'Договор с интервьюером — версия 0',
+  styles: { default: { document: { run: { font: FONT, size: SIZE } } } },
   comments: { children: comments },
-  sections: [{ properties: { page: { margin: { top: 1134, bottom: 1134, left: 1418, right: 850 } } }, children: body }],
+  sections: [{ properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 964, right: 907, bottom: 850, left: 907 } } }, children: [...head, table] }],
 });
-Packer.toBuffer(doc).then((b) => { fs.writeFileSync(outPath, b); console.log('ok', outPath, 'пунктов', data.clauses.length, 'примечаний', comments.length); });
+Packer.toBuffer(doc).then((b) => { fs.writeFileSync(outPath, b); console.log('ok', outPath, 'строк таблицы', rows.length, 'примечаний', comments.length); });

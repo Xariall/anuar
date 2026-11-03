@@ -15,6 +15,7 @@ groups = [
 drop = set()
 # реквизиты (разд. 9) не сравниваются построчно: отрезать их от п. 8.3 и заголовка 9
 for r in rows:
+    if r["g"] not in ("8", "9"): continue
     for c in r["cells"].values():
         L = c["text"].split("\n"); cut = [i for i, l in enumerate(L) if i and re.search(r"Мекенжайы|ФИО|Адрес", l)]
         if cut: c["text"] = "\n".join(L[:cut[0]])
